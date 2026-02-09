@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Study Planner</title>
+
+  <meta name="theme-color" content="#2563eb">
+
+  <style>
+    :root{
+      --bg:#020617;
+      --card:#0b1220;
+      --accent:#3b82f6;
+      --border:#1e293b;
+      --text:#e5e7eb;
+      --muted:#94a3b8;
+    }
+
+    body{
+      margin:0;
+      font-family: system-ui, "Segoe UI";
+      background:linear-gradient(180deg,#020617,#050b1a);
+      color:var(--text);
+    }
+
+    header{
+      padding:16px;
+      text-align:center;
+      font-size:20px;
+      font-weight:900;
+      background:linear-gradient(135deg,#020617,#0b1220);
+      border-bottom:1px solid var(--border);
+    }
+
+    .container{ padding:12px; }
+
+    .card{
+      background:var(--card);
+      border-radius:16px;
+      padding:14px;
+      margin-bottom:12px;
+      box-shadow:0 10px 30px rgba(0,0,0,.3);
+    }
+
+    .card-title{
+      font-weight:800;
+      color:var(--accent);
+      margin-bottom:8px;
+    }
+
+    .row{
+      display:flex;
+      gap:8px;
+      margin-bottom:8px;
+    }
+
+    .row input, .row select{
+      flex:1;
+      padding:8px;
+      border-radius:10px;
+      border:1px solid var(--border);
+      background:#020617;
+      color:var(--text);
+    }
+
+    button{
+      width:100%;
+      padding:10px;
+      border:none;
+      border-radius:12px;
+      background:var(--accent);
+      color:white;
+      font-weight:800;
+      margin-top:6px;
+    }
+
+    .plan-item{
+      border-bottom:1px dashed var(--border);
+      padding:8px 0;
+      font-size:14px;
+    }
+
+    .plan-item strong{
+      color:#60a5fa;
+    }
+
+    .small{
+      font-size:12px;
+      color:var(--muted);
+    }
+    progress::-webkit-progress-bar {
+  background-color: #020617;
+  border-radius: 10px;
+}
+
+progress::-webkit-progress-value {
+  background: linear-gradient(90deg,#3b82f6,#60a5fa);
+  border-radius: 10px;
+}
+  </style>
+</head>
+<body>
+
+<header>🤖 AI Study Planner</header>
+
+<div class="container">
+
+<!-- Input -->
+<div class="card">
+  <div class="card-title">Tạo kế hoạch học</div>
+
+  <div class="row">
+    <input id="subject" placeholder="Môn học (VD: Toán, Lý, IELTS)">
+  </div>
+
+  <div class="row">
+    <select id="difficulty">
+      <option value="easy">Dễ</option>
+      <option value="medium">Trung bình</option>
+      <option value="hard">Khó</option>
+    </select>
+
+    <input id="deadline" type="date">
+  </div>
+
+  <div class="row">
+    <input id="hours" type="number" min="1" placeholder="Giờ rảnh mỗi ngày (VD: 2)">
+  </div>
+
+  <button onclick="generatePlan()">⚡ Tạo kế hoạch tự động</button>
+</div>
+
+<!-- Output -->
+<div class="card">
+  <div class="card-title">Kế hoạch học tập</div>
+
+  <!-- Progress -->
+  <div class="small">Tiến độ học</div>
+  <progress id="progressBar" value="0" max="100" style="width:100%;height:14px;"></progress>
+  <div class="small" id="progressText">0% hoàn thành</div>
+
+  <div id="planList" style="margin-top:10px;"></div>
+</div>
+
+</div>
+
+<script>
+let plans = JSON.parse(localStorage.getItem('studyPlans')||'[]');
+const planList = document.getElementById('planList');
+const progressBar = document.getElementById('progressBar');
+const progressText = document.getElementById('progressText');
+function daysBetween(d1, d2){
+  const diff = new Date(d2) - new Date(d1);
+  return Math.max(1, Math.ceil(diff / (1000*60*60*24)));
+}
+
+function generatePlan(){
+  const subject = document.getElementById('subject').value.trim();
+  const difficulty = document.getElementById('difficulty').value;
+  const deadline = document.getElementById('deadline').value;
+  const hours = parseInt(document.getElementById('hours').value);
+
+  if(!subject || !deadline || !hours){
+    alert('Vui lòng nhập đầy đủ thông tin!');
+    return;
+  }
+
+  const today = new Date().toISOString().split('T')[0];
+  const days = daysBetween(today, deadline);
+
+  let workload = 1;
+  if(difficulty === 'medium') workload = 1.5;
+  if(difficulty === 'hard') workload = 2;
+
+  const totalStudyHours = Math.round(days * hours * workload);
+
+  const planText = `
+Học ${subject} trong ${days} ngày.
+Mỗi ngày học khoảng ${hours} giờ.
+Độ khó: ${difficulty}.
+Tổng thời gian đề xuất: ~${totalStudyHours} giờ.
+Gợi ý: Chia nhỏ thành ${Math.max(3, Math.round(days/2))} chặng học.
+  `;
+
+  const plan = {
+    subject,
+    difficulty,
+    deadline,
+    hours,
+    days,
+    totalStudyHours,
+    created: new Date().toLocaleString(),
+    planText
+  };
+
+  plans.unshift(plan);
+  localStorage.setItem('studyPlans', JSON.stringify(plans));
+  renderPlans();
+}
+
+function renderPlans(){
+  planList.innerHTML = '';
+
+  if(plans.length === 0){
+    planList.innerHTML = '<div class="small">Chưa có kế hoạch nào.</div>';
+    progressBar.value = 0;
+    progressText.textContent = '0% hoàn thành';
+    return;
+  }
+
+  const today = new Date();
+  let totalDays = 0;
+  let passedDays = 0;
+
+  plans.forEach(p=>{
+    totalDays += p.days;
+
+    const start = new Date(p.created);
+    const end = new Date(p.deadline);
+
+    const diff = Math.min(
+      p.days,
+      Math.max(0, Math.ceil((today - start) / (1000*60*60*24)))
+    );
+
+    passedDays += diff;
+  });
+
+  const percent = Math.min(100, Math.round((passedDays / totalDays) * 100));
+  progressBar.value = percent;
+  progressText.textContent = percent + '% hoàn thành';
+
+  plans.forEach(p=>{
+    const div = document.createElement('div');
+    div.className = 'plan-item';
+    div.innerHTML = `
+      <strong>${p.subject}</strong> (Hạn: ${p.deadline})<br>
+      ${p.planText.replace(/\n/g,'<br>')}
+      <div class="small">Tạo lúc: ${p.created}</div>
+    `;
+    planList.appendChild(div);
+  });
+}
+
+renderPlans();
+</script>
+
+</body>
+</html>
